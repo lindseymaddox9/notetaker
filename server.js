@@ -3,61 +3,52 @@ const PORT = 3001;
 const path = require("path");
 const notes = require("./db/db.json");
 const app = express();
+const uuid = require("./helper/uuid");
+const fs = require("fs/promises");
 
-
-// Middleware for parsing JSON and urlencoded form data
+// Middleware for parsing JSON and url encoded form data
+// Middleware to serve up static assets from the public folder
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-// Middleware to serve up static assets from the public folder
 app.use(express.static("public"));
 
-// * `GET /api/notes` should read the `db.json` file and
 // return all saved notes as JSON.
+app.get("/notes", (req, res) => {
+  res.sendFile(path.join(__dirname, "/public/notes.html"));
+});
 
 app.get("/api/notes", (req, res) => {
   res.json(notes);
 });
 
-// * `POST /api/notes` should receive a new note to save on
-// the request body, add it to the `db.json` file, and then
-// return the new note to the client.
+app.post("/api/notes", async (req, res) => {
+  let newNote;
 
-app.post("/api/notes", (req, res) => {
-res.sendFile('/public/index.html')
-});
+  if (req.body.title && req.body.text) {
+    newNote = {
+      title: req.body.title,
+      text: req.body.text,
+      id: uuid(),
+    };
 
-const readAndAppend = (content, file) => {
-    fs.readFile(file, 'utf8', (err, data) => {
-      if (err) {
-        console.error(err);
-      } else {
-        const parsedData = JSON.parse(data);
-        parsedData.push(content);
-        writeToFile(file, parsedData);
-      }
-    });
-  };
-  
-  module.exports = { readFromFile, writeToFile, readAndAppend };
+    try {
+      const currentNotes = await fs.readFile("./db/db.json", "utf8");
 
-// * `GET /notes` should return the `notes.html` file.
+      const currentData = JSON.parse(currentNotes);
 
-app.get("/notes", (req, res) => {
-  res.sendFile(path.join(__dirname, "/public/notes.html"));
-});
+      currentData.push(newNote);
 
-// * `GET *` should return the `index.html` file.
-app.get("*", (req, res) => {
-  res.sendFile(path.join(__dirname, "/public/index.html"));
+      await fs.writeFile("./db/db.json", JSON.stringify(currentData, null, 2));
+
+      notes.push(newNote);
+
+      res.status(201).json(newNote);
+    } catch {
+      res.status(400).json("unable to save note");
+    }
+  }
 });
 
 app.listen(PORT, () =>
   console.log(`App listening at http://localhost:${PORT}`)
 );
-
-// // (look into npm packages that could do this for you).
-// //uuid package
-// //const { v4: uuidv4 } = require('uuid');
-
-// //const userId=uuidv4();
-// //console.log(userId); // ⇨ '9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d'
